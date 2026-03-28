@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFCE TERMINAL SYSTEM</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            color: #00ff41;
+            font-family: 'VT323', monospace;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+            background-size: 4px 4px;
+        }
+
+        /* CRT эффекты */
+        .crt-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(0, 255, 65, 0.03) 1px,
+                transparent 2px
+            );
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100%; }
+        }
+
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 5px #00ff41, 0 0 10px #00ff41;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border-bottom: 1px solid #00ff41;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .creator {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .blink {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 30px;
+        }
+
+        .commands-section {
+            flex: 3;
+        }
+
+        .command-list {
+            list-style: none;
+        }
+
+        .command-item {
+            padding: 15px 20px;
+            margin: 10px 0;
+            border: 1px solid #00ff41;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .command-item:hover {
+            background-color: rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 15px #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+
+        .command-item::before {
+            content: "> ";
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background-color: rgba(0, 15, 5, 0.95);
+            border: 2px solid #00ff41;
+            padding: 30px;
+            width: 80%;
+            max-width: 500px;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.5);
+        }
+
+        .modal.active {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #003300;
+            border: 1px solid #00ff41;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #00ff41;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #003300;
+            border-top: 3px solid #00ff41;
+            border-radius: 50%;
+            margin: 20px auto;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-log {
+            flex: 1;
+            border: 1px solid #00ff41;
+            padding: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .error-log h2 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .error-item {
+            color: orange;
+            padding: 8px;
+            border-bottom: 1px dashed rgba(255, 165, 0, 0.3);
+        }
+
+        .event-log {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(0, 15, 5, 0.7);
+            border: 1px solid #00ff41;
+            padding: 15px;
+            width: calc(100% - 40px);
+            max-width: 800px;
+            font-size: 0.9rem;
+        }
+
+        .event-log h3 {
+            margin-bottom: 10px;
+        }
+
+        .events {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            margin: 5px 0;
+            opacity: 0.7;
+        }
+
+        .audio-control {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 15, 5, 0.7);
+            border: 1px solid #00ff41;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .audio-control:hover {
+            background-color: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        .critical-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.1);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+            animation: glitch 0.5s infinite;
+        }
+
+        .critical-mode.active {
+            display: flex;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-5px, 5px); }
+            40% { transform: translate(5px, -5px); }
+            60% { transform: translate(-5px, 5px); }
+            80% { transform: translate(5px, -5px); }
+            100% { transform: translate(0); }
+        }
+
+        .critical-text {
+            font-size: 3rem;
+            color: red;
+            text-shadow: 0 0 10px red;
+            margin-bottom: 30px;
+            animation: textGlitch 0.3s infinite;
+        }
+
+        @keyframes textGlitch {
+            0% { text-shadow: 0 0 10px red; }
+            50% { text-shadow: 5px 5px 10px red, -5px -5px 10px red; }
+            100% { text-shadow: 0 0 10px red; }
+        }
+
+        .emergency-btn {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            cursor: pointer;
+            border: 2px solid white;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .emergency-btn:hover {
+            background-color: darkred;
+            box-shadow: 0 0 20px red;
+        }
+
+        .clear-screen {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 15, 5, 0.7);
+            border: 1px solid #00ff41;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .clear-screen:hover {
+            background-color: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .error-log {
+                max-height: 200px;
+                order: 3;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .command-item {
+                padding: 12px 15px;
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Эффекты CRT -->
+    <div class="crt-effect"></div>
+    <div class="vignette"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1 class="glow-text">SFCE TERMINAL SYSTEM</h1>
+            <div class="creator">Создатель системы SFCE Генри Милс <span class="blink">_</span></div>
+        </div>
+        
+        <div class="main-content">
+            <div class="commands-section">
+                <ul class="command-list">
+                    <li class="command-item glow-text" data-command="reboot">Перезагрузка Системы</li>
+                    <li class="command-item glow-text" data-command="check">Проверка системы</li>
+                    <li class="command-item glow-text" data-command="ventilation">Вентиляция</li>
+                    <li class="command-item glow-text" data-command="power">Отключение питания</li>
+                </ul>
+            </div>
+            
+            <div class="error-log">
+                <h2>ЖУРНАЛ ОШИБОК [ACTIVE]</h2>
+                <div id="error-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно выполнения -->
+    <div class="modal" id="execution-modal">
+        <div class="modal-header glow-text">[EXECUTING...]</div>
+        <div id="command-name">[COMMAND: ]</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="spinner" id="spinner" style="display: none;"></div>
+    </div>
+    
+    <!-- Критический режим -->
+    <div class="critical-mode" id="critical-mode">
+        <div class="critical-text">СИСТЕМА В КРИТИЧЕСКОМ СОСТОЯНИИ</div>
+        <button class="emergency-btn" id="emergency-reset">АВАРИЙНАЯ ПЕРЕЗАГРУЗКА</button>
+    </div>
+    
+    <!-- Лог событий -->
+    <div class="event-log">
+        <h3>ЛОГ СОБЫТИЙ:</h3>
+        <div class="events" id="event-log"></div>
+        <div class="clear-screen" id="clear-screen">CLEAR SCREEN</div>
+    </div>
+    
+    <!-- Управление аудио -->
+    <div class="audio-control glow-text" id="audio-control">
+        [ ВКЛЮЧИТЬ АУДИО ]
+    </div>
+    
+    <!-- Аудио элементы -->
+    <audio id="background-audio" loop>
+        <source src="SMO.MP3" type="audio/mpeg">
+    </audio>
+    <audio id="dial-up-sound">
+        <source src="dial_up.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="glitch-sound">
+        <source src="glitch.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Основные переменные
+        const commands = [
+            { name: "Перезагрузка Системы", action: "reboot" },
+            { name: "Проверка системы", action: "check" },
+            { name: "Вентиляция", action: "ventilation" },
+            { name: "Отключение питания", action: "power" }
+        ];
+        
+        const errors = [
+            "Ошибка вентиляции",
+            "Error 34: требуется перезагрузка",
+            "Перегрев процессора",
+            "Низкий уровень питания"
+        ];
+        
+        let errorLog = [];
+        let eventLog = [];
+        let isAudioEnabled = false;
+        let criticalModeActive = false;
+        let errorCount = 0;
+        
+        // DOM элементы
+        const executionModal = document.getElementById('execution-modal');
+        const commandNameElement = document.getElementById('command-name');
+        const progressFill = document.getElementById('progress-fill');
+        const spinner = document.getElementById('spinner');
+        const errorList = document.getElementById('error-list');
+        const eventLogElement = document.getElementById('event-log');
+        const audioControl = document.getElementById('audio-control');
+        const backgroundAudio = document.getElementById('background-audio');
+        const dialUpSound = document.getElementById('dial-up-sound');
+        const glitchSound = document.getElementById('glitch-sound');
+        const criticalMode = document.getElementById('critical-mode');
+        const emergencyReset = document.getElementById('emergency-reset');
+        const clearScreenBtn = document.getElementById('clear-screen');
+        
+        // Инициализация
+        function init() {
+            setupEventListeners();
+            startErrorGenerator();
+            addEvent("СИСТЕМА ЗАПУЩЕНА");
+        }
+        
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            // Команды
+            document.querySelectorAll('.command-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const command = this.getAttribute('data-command');
+                    executeCommand(command);
+                });
+            });
+            
+            // Аудио управление
+            audioControl.addEventListener('click', toggleAudio);
+            
+            // Аварийная перезагрузка
+            emergencyReset.addEventListener('click', emergencyResetSystem);
+            
+            // Очистка экрана
+            clearScreenBtn.addEventListener('click', clearScreen);
+        }
+        
+        // Выполнение команды
+        function executeCommand(command) {
+            const commandName = getCommandName(command);
+            commandNameElement.textContent = `[COMMAND: ${commandName}]`;
+            
+            // Проигрываем звук
+            if (isAudioEnabled) {
+                dialUpSound.currentTime = 0;
+                dialUpSound.play();
+            }
+            
+            // Добавляем событие
+            addEvent(`COMMAND EXECUTED: ${command}`);
+            
+            // Показываем модальное окно
+            executionModal.classList.add('active');
+            
+            // Определяем тип выполнения
+            if (command === 'check') {
+                // Для проверки системы показываем спиннер
+                spinner.style.display = 'block';
+                progressFill.parentElement.style.display = 'none';
+                
+                setTimeout(() => {
+                    spinner.style.display = 'none';
+                    executionModal.classList.remove('active');
+                    
+                    // 70% успешная проверка, 30% добавление ошибки
+                    if (Math.random() < 0.7) {
+                        addEvent("Состояние стабильно ✓");
+                    } else {
+                        generateError();
+                        addEvent("Обнаружена новая ошибка!");
+                    }
+                }, 10000);
+            } else {
+                // Для остальных команд показываем прогресс бар
+                spinner.style.display = 'none';
+                progressFill.parentElement.style.display = 'block';
+                progressFill.style.width = '0%';
+                
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 10;
+                    progressFill.style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        executionModal.classList.remove('active');
+                        
+                        // Исправляем ошибки в зависимости от команды
+                        fixErrors(command);
+                    }
+                }, 1000);
+            }
+        }
+        
+        // Получение имени команды
+        function getCommandName(command) {
+            const cmd = commands.find(c => c.action === command);
+            return cmd ? cmd.name : command;
+        }
+        
+        // Исправление ошибок
+        function fixErrors(command) {
+            switch(command) {
+                case 'reboot':
+                    removeError("Error 34: требуется перезагрузка");
+                    break;
+                case 'ventilation':
+                    removeError("Ошибка вентиляции");
+                    removeError("Перегрев процессора");
+                    break;
+                case 'power':
+                    removeError("Низкий уровень питания");
+                    break;
+            }
+        }
+        
+        // Удаление ошибки
+        function removeError(errorText) {
+            const index = errorLog.findIndex(e => e.text === errorText);
+            if (index !== -1) {
+                errorLog.splice(index, 1);
+                renderErrorLog();
+                addEvent(`ОШИБКА ИСПРАВЛЕНА: ${errorText}`);
+            }
+        }
+        
+        // Генератор ошибок
+        function startErrorGenerator() {
+            setInterval(() => {
+                if (!criticalModeActive) {
+                    generateError();
+                }
+            }, Math.random() * 5000 + 20000); // 20-25 секунд
+        }
+        
+        // Создание ошибки
+        function generateError() {
+            const randomError = errors[Math.floor(Math.random() * errors.length)];
+            const errorEntry = {
+                text: randomError,
+                time: new Date().toLocaleTimeString()
+            };
+            
+            errorLog.push(errorEntry);
+            renderErrorLog();
+            
+            // Проверяем на критический режим
+            errorCount++;
+            if (errorLog.length >= 3 && !criticalModeActive) {
+                activateCriticalMode();
+            }
+            
+            // Проигрываем звук глюка
+            if (isAudioEnabled) {
+                glitchSound.currentTime = 0;
+                glitchSound.play();
+            }
+        }
+        
+        // Рендер журнала ошибок
+        function renderErrorLog() {
+            errorList.innerHTML = '';
+            errorLog.forEach(error => {
+                const errorElement = document.createElement('div');
+                errorElement.className = 'error-item';
+                errorElement.textContent = `[${error.time}] ${error.text}`;
+                errorList.appendChild(errorElement);
+            });
+        }
+        
+        // Активация критического режима
+        function activateCriticalMode() {
+            criticalModeActive = true;
+            criticalMode.classList.add('active');
+            addEvent("КРИТИЧЕСКИЙ РЕЖИМ АКТИВИРОВАН");
+            
+            // Проигрываем звук глюка
+            if (isAudioEnabled) {
+                glitchSound.currentTime = 0;
+                glitchSound.play();
+            }
+        }
+        
+        // Аварийная перезагрузка системы
+        function emergencyResetSystem() {
+            if (errorLog.length > 0) {
+                errorLog = [];
+                renderErrorLog();
+                criticalModeActive = false;
+                criticalMode.classList.remove('active');
+                errorCount = 0;
+                addEvent("СИСТЕМА ПЕРЕЗАГРУЖЕНА");
+            } else {
+                alert("Сейчас нету критической ошибки");
+            }
+        }
+        
+        // Добавление события в лог
+        function addEvent(text) {
+            const time = new Date().toLocaleTimeString();
+            const eventEntry = {
+                text: text,
+                time: time
+            };
+            
+            eventLog.unshift(eventEntry);
+            renderEventLog();
+        }
+        
+        // Рендер лога событий
+        function renderEventLog() {
+            eventLogElement.innerHTML = '';
+            eventLog.slice(0, 5).forEach(event => {
+                const eventElement = document.createElement('div');
+                eventElement.className = 'event-item';
+                eventElement.textContent = `[${event.time}] ${event.text}`;
+                eventLogElement.appendChild(eventElement);
+            });
+        }
+        
+        // Очистка экрана
+        function clearScreen() {
+            eventLog = [];
+            renderEventLog();
+            addEvent("ЭКРАН ОЧИЩЕН");
+        }
+        
+        // Управление аудио
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            
+            if (isAudioEnabled) {
+                backgroundAudio.volume = 0.2;
+                backgroundAudio.play();
+                audioControl.textContent = "[ ВЫКЛЮЧИТЬ АУДИО ]";
+            } else {
+                backgroundAudio.pause();
+                audioControl.textContent = "[ ВКЛЮЧИТЬ АУДИО ]";
+            }
+        }
+        
+        // Инициализация при загрузке страницы
+        window.onload = init;
+    </script>
+</body>
+</html>
